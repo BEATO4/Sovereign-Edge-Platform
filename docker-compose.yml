@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  # 1. Open Service Broker (FastAPI + SQS Worker + DynamoDB store)
+  service-broker:
+    build:
+      context: .
+      dockerfile: services/service_broker/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+    restart: unless-stopped
+
+  # 2. Sovereign Envoy xDS Control Plane (Jinja2 Template Engine + Poller)
+  sovereign-control-plane:
+    build:
+      context: .
+      dockerfile: services/sovereign_control_plane/Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      - service-broker
+    restart: unless-stopped
+
+  # 3. Rust Edge ASAP Authentication Sidecar (ext_authz)
+  edge-auth-rust:
+    build:
+      context: ./services/edge_auth_rust
+      dockerfile: Dockerfile
+    ports:
+      - "9001:9001"
+    restart: unless-stopped
+
+  # 4. Envoy Proxy (Data Plane)
+  edge-proxy:
+    image: envoyproxy/envoy:v1.30-latest
+    volumes:
+      - ./services/edge_proxy/envoy-dynamic.yaml:/etc/envoy/envoy.yaml:ro
+    ports:
+      - "10000:10000"
+      - "9901:9901"
+    depends_on:
+      - sovereign-control-plane
+      - edge-auth-rust
+    restart: unless-stopped
+
+  # 5. Upstream Atlassian Microservices
+  jira-service:
+    build:
+      context: .
+      dockerfile: services/mock_workloads/Dockerfile
+    environment:
+      - SERVICE_NAME=jira
+      - PORT=8081
+    ports:
+      - "8081:8081"
+
+  confluence-service:
+    build:
+      context: .
+      dockerfile: services/mock_workloads/Dockerfile
+    environment:
+      - SERVICE_NAME=confluence
+      - PORT=8082
+    ports:
+      - "8082:8082"
+
+  # 6. Interactive Visual Dashboard & Orchestrator Portal
+  dashboard:
+    build:
+      context: .
+      dockerfile: web-ui/Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - service-broker
+      - sovereign-control-plane

@@ -1,0 +1,20 @@
+[Unit]
+Description=Sovereign Envoy Proxy Edge Gateway
+After=network.target remote-fs.target
+Documentation=https://www.envoyproxy.io/docs/envoy/latest/
+
+[Service]
+Type=simple
+User=envoy
+Group=envoy
+ExecStartPre=/usr/local/bin/envoy --mode validate -c /etc/envoy/envoy.yaml
+ExecStart=/usr/local/bin/envoy -c /etc/envoy/envoy.yaml --drain-time-s 45 --service-cluster edge-proxy --service-node %H
+Restart=always
+RestartSec=5s
+LimitNOFILE=65536
+LimitNPROC=65536
+KillMode=mixed
+TimeoutStopSec=60s
+
+[Install]
+WantedBy=multi-user.target

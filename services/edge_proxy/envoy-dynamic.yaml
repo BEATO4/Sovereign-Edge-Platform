@@ -1,0 +1,47 @@
+# Envoy Dynamic Bootstrap Configuration
+# Connects Envoy Data Plane to Sovereign xDS Control Plane
+# Dynamic CDS, LDS, and RDS subscription
+
+node:
+  cluster: edge_cluster_fleet
+  id: envoy_edge_node_01
+
+dynamic_resources:
+  cds_config:
+    api_config_source:
+      api_type: REST
+      transport_api_version: V3
+      cluster_names:
+        - sovereign_control_plane
+      refresh_delay: 2s
+
+  lds_config:
+    api_config_source:
+      api_type: REST
+      transport_api_version: V3
+      cluster_names:
+        - sovereign_control_plane
+      refresh_delay: 2s
+
+static_resources:
+  clusters:
+    - name: sovereign_control_plane
+      connect_timeout: 0.5s
+      type: LOGICAL_DNS
+      dns_lookup_family: V4_ONLY
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: sovereign_control_plane
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: sovereign-control-plane
+                      port_value: 8080
+
+admin:
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9901

@@ -1,0 +1,58 @@
+{
+  "version_info": "{{ version_info }}",
+  "resources": [
+    {% for cluster in clusters %}
+    {
+      "@type": "type.googleapis.com/envoy.config.cluster.v3.Cluster",
+      "name": "{{ cluster.name }}",
+      "type": "LOGICAL_DNS",
+      "connect_timeout": "0.25s",
+      "lb_policy": "ROUND_ROBIN",
+      "dns_lookup_family": "V4_ONLY",
+      "circuit_breakers": {
+        "thresholds": [
+          {
+            "priority": "DEFAULT",
+            "max_connections": 1024,
+            "max_pending_requests": 1024,
+            "max_requests": 2048,
+            "max_retries": 3
+          }
+        ]
+      },
+      "load_assignment": {
+        "cluster_name": "{{ cluster.name }}",
+        "endpoints": [
+          {
+            "lb_endpoints": [
+              {% for endpoint in cluster.endpoints %}
+              {
+                "endpoint": {
+                  "address": {
+                    "socket_address": {
+                      "address": "{{ endpoint.host }}",
+                      "port_value": {{ endpoint.port }}
+                    }
+                  }
+                }
+              }{% if not loop.last %},{% endif %}
+              {% endfor %}
+            ]
+          }
+        ]
+      },
+      "health_checks": [
+        {
+          "timeout": "1s",
+          "interval": "5s",
+          "unhealthy_threshold": 3,
+          "healthy_threshold": 1,
+          "http_health_check": {
+            "path": "{{ cluster.health_check_path | default('/healthz') }}"
+          }
+        }
+      ]
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ]
+}

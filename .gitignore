@@ -1,0 +1,51 @@
+# Git Ignore for Sovereign Edge Platform
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Rust
+services/edge_auth_rust/target/
+**/*.rs.bk
+
+# Node & JS (if any)
+node_modules/
+npm-debug.log*
+
+# Environments & Secrets
+.env
+.env.local
+*.pem
+*.key
+
+# Test and coverage artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local run/state files
+*.log
+services/service_broker/osb_store.json
+services/service_broker/osb_sqs_queue.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Archive
+archive/

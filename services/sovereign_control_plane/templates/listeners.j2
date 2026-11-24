@@ -1,0 +1,81 @@
+{
+  "version_info": "{{ version_info }}",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.config.listener.v3.Listener",
+      "name": "edge_ingress_listener",
+      "address": {
+        "socket_address": {
+          "address": "0.0.0.0",
+          "port_value": {{ listener_port | default(10000) }}
+        }
+      },
+      "filter_chains": [
+        {
+          "filters": [
+            {
+              "name": "envoy.filters.network.http_connection_manager",
+              "typed_config": {
+                "@type": "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager",
+                "stat_prefix": "edge_ingress",
+                "rds": {
+                  "route_config_name": "edge_route_config",
+                  "config_source": {
+                    "api_config_source": {
+                      "api_type": "REST",
+                      "transport_api_version": "V3",
+                      "cluster_names": ["sovereign_control_plane"],
+                      "refresh_delay": "2s"
+                    }
+                  }
+                },
+                "http_filters": [
+                  {% if ext_authz_enabled %}
+                  {
+                    "name": "envoy.filters.http.ext_authz",
+                    "typed_config": {
+                      "@type": "type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz",
+                      "http_service": {
+                        "server_uri": {
+                          "uri": "http://{{ ext_authz_host | default('127.0.0.1:9001') }}/auth",
+                          "cluster": "edge_auth_rust_cluster",
+                          "timeout": "0.2s"
+                        },
+                        "authorization_request": {
+                          "allowed_headers": {
+                            "patterns": [
+                              {"exact": "authorization"},
+                              {"exact": "x-asap-token"},
+                              {"prefix": "x-tenant-"}
+                            ]
+                          }
+                        },
+                        "authorization_response": {
+                          "allowed_upstream_headers": {
+                            "patterns": [
+                              {"prefix": "x-asap-"},
+                              {"prefix": "x-tenant-"},
+                              {"exact": "x-authenticated-caller"}
+                            ]
+                          }
+                        }
+                      },
+                      "failure_mode_allow": false
+                    }
+                  },
+                  {% endif %}
+                  {
+                    "name": "envoy.filters.http.router",
+                    "typed_config": {
+                      "@type": "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "version_info": "{{ version_info }}",
+  "resources": [
+    {
+      "@type": "type.googleapis.com/envoy.config.route.v3.RouteConfiguration",
+      "name": "edge_route_config",
+      "virtual_hosts": [
+        {% for vhost in virtual_hosts %}
+        {
+          "name": "{{ vhost.name }}",
+          "domains": {{ vhost.domains | tojson }},
+          "routes": [
+            {% for route in vhost.routes %}
+            {
+              "match": {
+                "prefix": "{{ route.prefix }}"
+              },
+              "route": {
+                {% if route.weighted_clusters %}
+                "weighted_clusters": {
+                  "clusters": [
+                    {% for wc in route.weighted_clusters %}
+                    {
+                      "name": "{{ wc.name }}",
+                      "weight": {{ wc.weight }}
+                    }{% if not loop.last %},{% endif %}
+                    {% endfor %}
+                  ],
+                  "total_weight": 100
+                },
+                {% else %}
+                "cluster": "{{ route.cluster_name }}",
+                {% endif %}
+                "timeout": "15s",
+                "retry_policy": {
+                  "retry_on": "5xx,connect-failure,reset",
+                  "num_retries": 3,
+                  "per_try_timeout": "3s"
+                }
+              },
+              "request_headers_to_add": [
+                {
+                  "header": {
+                    "key": "x-forwarded-by",
+                    "value": "sovereign-envoy-edge"
+                  },
+                  "append": false
+                },
+                {
+                  "header": {
+                    "key": "x-edge-region",
+                    "value": "{{ region | default('us-east-1') }}"
+                  },
+                  "append": false
+                }
+              ]
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+          ]
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+      ]
+    }
+  ]
+}
